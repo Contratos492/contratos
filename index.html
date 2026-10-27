@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contratos SVSA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="estilo.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232B5D7C'/%3E%3Cpath d='M10 8h9l4 4v12H10z' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E">
+</head>
+<body>
+<div class="login" id="login">
+  <div class="lcard">
+    <div><div class="eyebrow">Laticínios São Vicente de Minas</div><h1>Contratos SVSA</h1></div>
+    <form id="loginForm">
+      <div class="field"><label for="lEmail">E-mail</label><input id="lEmail" type="email" autocomplete="username" required></div>
+      <div class="field"><label for="lSenha">Senha</label><input id="lSenha" type="password" autocomplete="current-password" required></div>
+      <button class="btn primary" id="lBtn" type="submit">Entrar</button>
+      <button class="linkbtn" id="lEsqueci" type="button">Esqueci minha senha</button>
+    </form>
+    <form id="novaSenhaForm" hidden>
+      <h2 id="nsTitulo" style="margin:0;font-size:18px">Crie a sua senha</h2>
+      <p class="edited" id="nsTexto" style="margin:0"></p>
+      <div class="field"><label for="ns1">Nova senha (mínimo 8 caracteres)</label><input id="ns1" type="password" autocomplete="new-password"></div>
+      <div class="field"><label for="ns2">Repita a nova senha</label><input id="ns2" type="password" autocomplete="new-password"></div>
+      <span class="lmsg bad" id="nsMsg"></span>
+      <button class="btn primary" id="nsBtn" type="submit">Salvar senha</button>
+      <button class="linkbtn" id="nsCancel" type="button" hidden>Voltar sem alterar</button>
+    </form>
+    <span class="lmsg" id="lMsg"></span>
+  </div>
+</div>
+
+<div id="app" hidden>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Gestão de contratos · Laticínios São Vicente de Minas</div>
+      <h1>Contratos SVSA</h1>
+      <p class="sub" id="sub">Carregando contratos…</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end">
+      <div class="userbar"><span id="who"></span><button class="linkbtn" id="trocarSenha" type="button">Alterar senha</button><button class="linkbtn" id="sair" type="button">Sair</button></div>
+      <div class="topbar">
+        <span class="sync" id="sync">Conectando…</span>
+        <button class="btn" id="export" type="button">Exportar Excel</button>
+        <button class="btn primary" id="new" type="button" hidden>+ Novo contrato</button>
+      </div>
+      <nav class="tabs" id="tabs" hidden aria-label="Seções">
+        <button type="button" class="tab" data-view="contratos" aria-pressed="true">Contratos</button>
+        <button type="button" class="tab" data-view="gestores" aria-pressed="false">Gestores e acessos</button>
+        <button type="button" class="tab" data-view="arquivos" aria-pressed="false">Enviar arquivos</button>
+      </nav>
+      <div class="today">Situação calculada em <span id="today" class="num"></span></div>
+    </div>
+  </header>
+
+  <div class="scope" id="scope" hidden></div>
+
+  <div id="viewContratos" style="display:flex;flex-direction:column;gap:22px">
+
+  <section class="kpis" id="kpis" aria-label="Resumo por situação"></section>
+
+  <div class="grid2">
+    <section class="panel">
+      <div class="phead"><h2>Próximos prazos</h2><span class="eyebrow">Término ou aviso de renovação em até 120 dias</span></div>
+      <div class="alerts" id="alerts"></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><h2>Contratos por setor</h2><span class="eyebrow">clique para filtrar</span></div>
+      <div class="bars" id="bars"></div>
+      <div class="legend" id="legend"></div>
+    </section>
+  </div>
+
+  <section id="lista" style="display:flex;flex-direction:column;gap:12px;scroll-margin-top:16px">
+    <div class="controls">
+      <input id="q" type="search" placeholder="Buscar fornecedor, objeto, nº, observação…" aria-label="Buscar">
+      <select id="fSetor" aria-label="Setor"></select>
+      <select id="fStatus" aria-label="Situação"></select>
+      <select id="fUnid" aria-label="Unidade"></select>
+      <select id="fTipo" aria-label="Tipo"></select>
+      <select id="fConf" aria-label="Conferência"></select>
+      <button class="btn" id="clear" type="button">Limpar filtros</button>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th data-sort="num">Nº<span class="arr"></span></th>
+          <th data-sort="empresa">Fornecedor / objeto<span class="arr"></span></th>
+          <th data-sort="setorTxt">Setor<span class="arr"></span></th>
+          <th data-sort="unidades">Unidade<span class="arr"></span></th>
+          <th data-sort="st">Situação<span class="arr"></span></th>
+          <th data-sort="termino">Término<span class="arr"></span></th>
+          <th data-sort="rest" style="text-align:right">Dias rest.<span class="arr"></span></th>
+          <th data-sort="valor" style="text-align:right">Mensal (R$)<span class="arr"></span></th>
+          <th data-sort="updatedAt">Última edição<span class="arr"></span></th>
+        </tr></thead>
+        <tbody id="tbody"><tr class="loading"><td colspan="9">Carregando contratos…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+  </div>
+
+  <div id="viewGestores" hidden style="display:flex;flex-direction:column;gap:18px">
+    <section class="panel">
+      <div class="phead"><h2>Gestores e acessos</h2><span class="eyebrow">somente administradores</span></div>
+      <p class="edited" style="margin:0;font-size:13px">Como incluir um gestor: 1) clique em <b>Adicionar gestor</b>, preencha nome, e-mail e setor(es) e salve; 2) crie o login dele no Supabase (<b>Authentication → Users → Add user</b>, com uma senha provisória e <b>Auto Confirm User</b> marcado); 3) envie a ele o endereço do site, o e-mail e a senha provisória. No primeiro acesso ele cria a senha dele e passa a ver só os contratos do(s) setor(es) marcados. <b>Administrador</b> vê tudo, cadastra gestores e exclui contratos. Use <b>Todos os setores</b> para diretoria ou controladoria.</p>
+      <div class="tablewrap"><table class="gtable" style="min-width:900px"><thead><tr><th>Nome</th><th>E-mail</th><th>Setor(es)</th><th>Situação do login</th><th></th></tr></thead><tbody id="gbody"></tbody></table></div>
+      <div><button class="btn primary" id="gAdd" type="button">+ Adicionar gestor</button></div>
+    </section>
+  </div>
+  <div id="viewArquivos" hidden style="display:flex;flex-direction:column;gap:18px">
+    <section class="panel">
+      <div class="phead"><h2>Enviar arquivos em lote</h2><span class="eyebrow">somente administradores</span></div>
+      <p class="edited" style="margin:0;font-size:13px">Os contratos vieram do site anterior com o nome dos PDFs, mas os arquivos precisam ser enviados de novo. Escolha a pasta <b>Contratos</b> (e depois a <b>Distratos</b>) da rede: o site reconhece cada arquivo pelo nome e coloca no contrato certo. Arquivos que já estão no site são ignorados.</p>
+      <div id="arqResumo"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" id="arqFolder">Escolher pasta</button><button class="btn" type="button" id="arqPick">Escolher arquivos</button></div>
+      <input type="file" id="arqDir" webkitdirectory multiple hidden><input type="file" id="arqFiles" multiple hidden>
+      <div id="arqLog" style="display:flex;flex-direction:column;gap:6px"></div>
+      <details><summary class="edited" style="cursor:pointer">Arquivos que ainda faltam</summary><div id="arqLista" class="hist" style="margin-top:8px"></div></details>
+    </section>
+  </div>
+</div>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" hidden role="dialog" aria-modal="true" aria-labelledby="dTitle"></aside>
+<div class="toast" id="toast" hidden role="status"></div>
+<div class="modal" id="modal" hidden role="dialog" aria-modal="true"><div class="modalbox" id="modalBox"></div></div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
