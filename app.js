@@ -314,7 +314,7 @@ function drawForm(d){
       <div class="drop" id="drop">
         <div class="row"><button class="btn" type="button" id="pickPdf">Anexar arquivo</button>
           <span class="h">ou arraste aqui · PDF, Word, Excel ou imagem, até 50 MB</span></div>
-        <div class="h">O arquivo fica guardado junto com o contrato quando você salvar.</div>
+        <div class="h">Ao anexar um PDF, o site lê o documento e preenche os campos vazios. Revise tudo antes de salvar — o arquivo fica guardado junto com o contrato.</div>
         ${(v.anexos||[]).length?`<div class="h">Já anexados: ${esc(v.anexos.map(a=>a.nome).join(" · "))}</div>`:""}
         <div class="aistat" id="aiStat" aria-live="polite"></div>
         <input type="file" id="fPdf" multiple hidden>
@@ -339,7 +339,9 @@ function drawForm(d){
   document.getElementById("fCancel").onclick=()=>isNew?closeDrawer():drawView();
   document.getElementById("fSave").onclick=()=>saveForm(d);
   document.getElementById("f_empresa").focus();
-  pendingFiles=[];
+  pendingFiles=[]; leituraId++;
+  if(isNew) ["tipo","renovAuto","multa"].forEach(k=>{const e=document.getElementById("f_"+k); if(e) e.dataset.padrao=e.value;});
+  form.addEventListener("input",e=>{const fl=e.target.closest&&e.target.closest(".field"); if(fl&&e.isTrusted){ fl.classList.remove("ai"); const sel=fl.querySelector("select"); if(sel) delete sel.dataset.padrao; }});
   const drop=document.getElementById("drop"), fi=document.getElementById("fPdf");
   document.getElementById("pickPdf").onclick=()=>fi.click();
   fi.onchange=()=>{ addFiles([...fi.files]); fi.value=""; };
@@ -350,9 +352,82 @@ function drawForm(d){
 function aiStat(html,cls){const el=document.getElementById("aiStat");if(el){el.className="aistat "+(cls||"");el.innerHTML=html;}}
 function addFiles(list){
   const big=list.filter(f=>f.size>50*1024*1024);
-  pendingFiles.push(...list.filter(f=>f.size<=50*1024*1024));
+  const novos=list.filter(f=>f.size<=50*1024*1024);
+  pendingFiles.push(...novos);
   const arq=document.getElementById("f_arquivo"); if(arq&&!arq.value.trim()&&pendingFiles[0]) arq.value=pendingFiles[0].name;
-  aiStat((pendingFiles.length?`Pronto para anexar ao salvar: <b>${esc(pendingFiles.map(f=>f.name).join(", "))}</b>.`:"")+(big.length?` <span style="color:var(--bad)">Passa de 50 MB e não será anexado: ${esc(big.map(f=>f.name).join(", "))}.</span>`:""),big.length&&!pendingFiles.length?"bad":"ok");
+  const anexo=`${pendingFiles.length?`Pronto para anexar ao salvar: <b>${esc(pendingFiles.map(f=>f.name).join(", "))}</b>.`:""}${big.length?` <span style="color:var(--bad)">Passa de 50 MB e não será anexado: ${esc(big.map(f=>f.name).join(", "))}.</span>`:""}`;
+  aiStat(anexo,big.length&&!pendingFiles.length?"bad":"ok");
+  const pdf=novos.find(f=>/pdf$/i.test(f.type)||/\.pdf$/i.test(f.name));
+  if(pdf) lerPdf(pdf,anexo);
+}
+
+/* ---------- leitura automática do PDF (no navegador, sem custo) ---------- */
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=res;s.onerror=()=>rej(new Error("script "+src));document.head.appendChild(s);});}
+async function loadPdfJs(){
+  if(window.pdfjsLib) return;
+  const base="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+  await loadScript(base+"pdf.min.js"); pdfjsLib.GlobalWorkerOptions.workerSrc=base+"pdf.worker.min.js";
+}
+async function loadOcr(){ if(!window.Tesseract) await loadScript("https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"); }
+let leituraId=0;
+async function lerPdf(file,anexo){
+  const my=++leituraId;
+  const st=(h,c)=>{ if(my===leituraId) aiStat(`${anexo}<br>${h}`,c); };
+  const stop=`<button class="btn" type="button" id="aiStop" style="padding:3px 10px;margin-left:6px">Parar leitura</button>`;
+  const bindStop=()=>{const b=document.getElementById("aiStop"); if(b) b.onclick=()=>{leituraId++; aiStat(`${anexo}<br>Leitura interrompida. Preencha os campos à mão.`,"bad");};};
+  try{
+    st(`<span class="spin"></span>Lendo o PDF…${stop}`,"work"); bindStop();
+    await loadPdfJs();
+    const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+    let text="";
+    for(let i=1;i<=pdf.numPages;i++){ const pg=await pdf.getPage(i); const tc=await pg.getTextContent(); text+="\n"+tc.items.map(t=>t.str+(t.hasEOL?"\n":" ")).join(""); }
+    if(my!==leituraId) return;
+    const letras=text.replace(/[^A-Za-zÀ-ú0-9]/g,"").length;
+    if(letras<150*Math.min(pdf.numPages,3)){
+      const n=Math.min(pdf.numPages,8);
+      st(`<span class="spin"></span>O PDF é digitalizado (imagem). Reconhecendo o texto da página 1 de ${n}… pode levar 1 a 2 minutos.${stop}`,"work"); bindStop();
+      await loadOcr();
+      const worker=await Tesseract.createWorker("por");
+      text="";
+      try{
+        for(let i=1;i<=n;i++){
+          if(my!==leituraId) return;
+          st(`<span class="spin"></span>O PDF é digitalizado (imagem). Reconhecendo o texto da página ${i} de ${n}…${stop}`,"work"); bindStop();
+          const pg=await pdf.getPage(i); const v0=pg.getViewport({scale:1}); const vp=pg.getViewport({scale:Math.min(2.4,1700/v0.width)});
+          const c=document.createElement("canvas"); c.width=vp.width; c.height=vp.height;
+          await pg.render({canvasContext:c.getContext("2d"),viewport:vp}).promise;
+          const {data}=await worker.recognize(c); text+="\n"+data.text;
+        }
+      } finally { worker.terminate(); }
+    }
+    if(my!==leituraId) return;
+    const r=LeitorContrato.extrair(text,file.name);
+    const preenchidos=Object.keys(r).filter(k=>preencher(k,r[k]));
+    document.getElementById("form").dispatchEvent(new Event("input"));
+    st(preenchidos.length?`<b>${preenchidos.length} campos preenchidos a partir do PDF</b> (destacados em azul). A leitura é automática e pode errar: confira cada campo antes de salvar.`:"Não encontrei dados no documento. Preencha os campos à mão.",preenchidos.length?"ok":"bad");
+  }catch(e){
+    console.warn(e);
+    st("Não consegui ler esse PDF (pode estar protegido por senha ou a conexão falhou). Ele continua pronto para anexar; preencha os campos à mão.","bad");
+  }
+}
+function preencher(k,val){
+  const f=FIELDS.find(x=>x.k===k); const el=document.getElementById("f_"+k); if(!f||!el||val==null||val===""||(Array.isArray(val)&&!val.length)) return false;
+  if(f.t==="setores"||f.t==="units"){
+    const boxes=[...el.querySelectorAll("input")];
+    if(boxes.some(i=>i.checked)) return false;
+    const list=Array.isArray(val)?val:[val]; let ok=false;
+    boxes.forEach(i=>{ if(list.includes(i.value)){ i.checked=true; ok=true; } });
+    if(!ok) return false;
+  } else if(k==="obs"){
+    el.value=el.value.trim()?el.value.trim()+"\n\n[Lido do PDF] "+val:"[Lido do PDF] "+val;
+  } else {
+    if(String(el.value).trim()!=="" && !(f.t==="select" && el.dataset.padrao===el.value)) return false;
+    if(f.t==="select"){ const o=f.opts.find(o=>norm(o)===norm(val)); if(!o) return false; el.value=o; }
+    else if(f.t==="pct") el.value=val;
+    else el.value=val;
+  }
+  el.closest(".field").classList.add("ai");
+  return true;
 }
 function readForm(){
   const b={};
@@ -425,7 +500,7 @@ async function saveForm(orig){
 }
 
 function showDrawer(){document.getElementById("drawer").hidden=false;document.getElementById("scrim").hidden=false;}
-function closeDrawer(){pendingFiles=[];document.getElementById("drawer").hidden=true;document.getElementById("scrim").hidden=true;openNum=null;editing=false;}
+function closeDrawer(){pendingFiles=[];leituraId++;document.getElementById("drawer").hidden=true;document.getElementById("scrim").hidden=true;openNum=null;editing=false;}
 document.getElementById("scrim").onclick=()=>{ if(!editing) closeDrawer(); };
 document.addEventListener("keydown",e=>{if(e.key!=="Escape")return; if(!document.getElementById("modal").hidden){closeModal();return;} if(!editing)closeDrawer();});
 

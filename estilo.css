@@ -161,7 +161,7 @@ dd{margin:2px 0 0;overflow-wrap:anywhere}
 .aistat .spin{display:inline-block;width:10px;height:10px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;margin-right:6px;vertical-align:-1px}
 @media (prefers-reduced-motion:no-preference){.aistat .spin{animation:sp 0.8s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}}
 .field.ai input,.field.ai select,.field.ai textarea,.field.ai .checks{box-shadow:0 0 0 2px var(--accent-soft);border-color:var(--accent)}
-.field.ai .lab::after,.field.ai label:first-child::after{content:" · lido do PDF";color:var(--accent);text-transform:none;letter-spacing:0;font-weight:500}
+.field.ai > .lab::after,.field.ai > label:first-child::after{content:" · lido do PDF";color:var(--accent);text-transform:none;letter-spacing:0;font-weight:500}
 .pdfchip{display:inline-flex;gap:8px;align-items:center;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--surface);max-width:100%}
 .pdfchip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 a.btn{text-decoration:none;display:inline-flex;align-items:center}
