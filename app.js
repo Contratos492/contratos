@@ -481,15 +481,15 @@ async function saveForm(orig){
     const r=orig?await sb.from("contratos").update(row).eq("id",id).select("id"):await sb.from("contratos").insert({id,...row}).select("id");
     if(r.error) throw r.error;
     if(!r.data||!r.data.length) throw {code:"42501"};
-    let falhou=[];
+    let falhou=[], motivo="";
     if(pendingFiles.length){
       btn.textContent="Enviando arquivos…";
       const anexos=[...row.anexos];
-      for(const f of pendingFiles){ try{ anexos.push({nome:f.name,path:await uploadTo(id,f)}); }catch(e){ console.warn(e); falhou.push(f.name); } }
+      for(const f of pendingFiles){ try{ anexos.push({nome:f.name,path:await uploadTo(id,f)}); }catch(e){ console.warn(e); falhou.push(f.name); motivo=(e&&(e.message||e.error))||""; } }
       if(anexos.length!==row.anexos.length){ const u=await sb.from("contratos").update({anexos}).eq("id",id); if(u.error) throw u.error; }
     }
     pendingFiles=[];
-    toast((orig?"Alterações salvas":"Contrato cadastrado")+(falhou.length?`, mas não foi possível enviar: ${falhou.join(", ")}. Tente anexar de novo.`:""),!!falhou.length);
+    toast((orig?"Alterações salvas":"Contrato cadastrado")+(falhou.length?`, mas não foi possível enviar: ${falhou.join(", ")}${motivo?` (motivo: ${motivo})`:""}. Tente anexar de novo pelo botão Editar contrato.`:""),!!falhou.length);
     await loadContratos(); openNum=id; editing=false; drawView();
   }catch(e){
     console.warn(e);
@@ -514,7 +514,7 @@ document.getElementById("fConf").onchange=e=>{state.conf=e.target.value;sync();}
 document.getElementById("clear").onclick=()=>{Object.assign(state,{q:"",se:"",st:"",un:"",tipo:"",conf:""});sync();};
 document.querySelectorAll("th[data-sort]").forEach(th=>th.onclick=()=>{const k=th.dataset.sort;if(state.sort===k)state.dir*=-1;else{state.sort=k;state.dir=1;}saveF();renderTable();});
 document.getElementById("new").onclick=()=>{openNum=null;editing=true;drawForm(null);};
-const writable=()=>!!ME&&(isOwnerV||(ALLOWED&&ALLOWED.size>0));
+const writable=()=>!!ME&&(isOwnerV||ALLOWED===null||ALLOWED.size>0);
 function applyWriteUI(){ document.getElementById("new").hidden=!writable(); }
 
 /* ---------- exportar Excel ---------- */
