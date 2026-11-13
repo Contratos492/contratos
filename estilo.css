@@ -208,3 +208,8 @@ body{margin:0;min-height:100vh}
 .gedit .checks label{font-size:12px;padding:3px 8px}
 header>div:first-child{flex:1 1 380px;min-width:0}
 header>div:last-child{margin-left:auto}
+
+.llogo{display:block;width:180px;height:auto;margin:0 auto 2px}
+.brand{display:flex;align-items:center;gap:18px}
+.hlogo{width:118px;height:auto;flex:none}
+@media (max-width:600px){.brand{gap:12px}.hlogo{width:84px}.llogo{width:150px}}
