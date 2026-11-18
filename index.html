@@ -6,14 +6,14 @@
 <title>Contratos SVSA</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="estilo.css?v=4">
+<link rel="stylesheet" href="estilo.css?v=5">
 <link rel="icon" type="image/png" href="logo.png">
 <link rel="alternate icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232B5D7C'/%3E%3Cpath d='M10 8h9l4 4v12H10z' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E">
 </head>
 <body>
 <div class="login" id="login">
   <div class="lcard">
-    <img class="llogo" src="logo.png?v=4" alt="São Vicente" width="180" height="109" style="display:block;width:180px;max-width:60%;height:auto;margin:0 auto 2px">
+    <img class="llogo" src="logo.png?v=5" alt="São Vicente" width="180" height="109" style="display:block;width:180px;max-width:60%;height:auto;margin:0 auto 2px">
     <div style="text-align:center"><div class="eyebrow">Laticínios São Vicente de Minas</div><h1>Contratos SVSA</h1></div>
     <form id="loginForm">
       <div class="field"><label for="lEmail">E-mail</label><input id="lEmail" type="email" autocomplete="username" required></div>
@@ -38,7 +38,7 @@
 <div class="wrap">
   <header>
     <div class="brand" style="display:flex;align-items:center;gap:18px">
-      <img class="hlogo" src="logo.png?v=4" alt="São Vicente" width="118" height="72" style="width:118px;max-width:28vw;height:auto;flex:none">
+      <img class="hlogo" src="logo.png?v=5" alt="São Vicente" width="118" height="72" style="width:118px;max-width:28vw;height:auto;flex:none">
       <div>
       <div class="eyebrow">Gestão de contratos · Laticínios São Vicente de Minas</div>
       <h1>Contratos SVSA</h1>
@@ -119,10 +119,23 @@
   </div>
   <div id="viewArquivos" hidden style="display:flex;flex-direction:column;gap:18px">
     <section class="panel">
-      <div class="phead"><h2>Enviar arquivos em lote</h2><span class="eyebrow">somente administradores</span></div>
+      <div class="phead"><h2>Importar novos contratos em lote</h2><span class="eyebrow">somente administradores</span></div>
+      <p class="edited" style="margin:0;font-size:13px">Para cadastrar vários contratos <b>novos</b> de uma vez: escolha o setor e a pasta com os PDFs. Para cada arquivo, o site lê o documento, cria o contrato com os dados encontrados, anexa o PDF e marca como <b>“precisa de verificação”</b> para você revisar depois (filtro “Toda conferência” → “Precisa de verificação”). Arquivos com o mesmo nome de um anexo já existente são ignorados, então pode repetir a pasta sem duplicar.</p>
+      <div class="fgrid" style="max-width:900px">
+        <div class="field"><label for="impSetor">Setor dos contratos</label><select id="impSetor"></select></div>
+        <div class="field"><label for="impTipo">Tipo</label><select id="impTipo"><option value="">Usar o que o site identificar</option><option>Recorrente</option><option>Específico</option></select></div>
+        <div class="field full"><span class="lab">Unidade(s) — opcional (se vazio, usa a que o site identificar no PDF)</span><div class="checks" id="impUnid"></div></div>
+        <div class="field full"><label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink)"><input type="checkbox" id="impOcr" checked style="width:auto"> Ler também PDFs digitalizados (imagem) — mais lento, cerca de 15 segundos por arquivo</label></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" id="impFolder">Escolher pasta</button><button class="btn" type="button" id="impPick">Escolher arquivos</button><button class="btn danger" type="button" id="impStop" hidden>Parar importação</button></div>
+      <input type="file" id="impDir" webkitdirectory multiple hidden><input type="file" id="impFiles" multiple accept=".pdf,application/pdf" hidden>
+      <div id="impLog" style="display:flex;flex-direction:column;gap:6px"></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><h2>Reenviar PDFs do site antigo</h2><span class="eyebrow">somente administradores</span></div>
       <p class="edited" style="margin:0;font-size:13px">Os contratos vieram do site anterior com o nome dos PDFs, mas os arquivos precisam ser enviados de novo. Escolha a pasta <b>Contratos</b> (e depois a <b>Distratos</b>) da rede: o site reconhece cada arquivo pelo nome e coloca no contrato certo. Arquivos que já estão no site são ignorados.</p>
       <div id="arqResumo"></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" id="arqFolder">Escolher pasta</button><button class="btn" type="button" id="arqPick">Escolher arquivos</button></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" id="arqFolder">Escolher pasta</button><button class="btn" type="button" id="arqPick">Escolher arquivos</button></div>
       <input type="file" id="arqDir" webkitdirectory multiple hidden><input type="file" id="arqFiles" multiple hidden>
       <div id="arqLog" style="display:flex;flex-direction:column;gap:6px"></div>
       <details><summary class="edited" style="cursor:pointer">Arquivos que ainda faltam</summary><div id="arqLista" class="hist" style="margin-top:8px"></div></details>
@@ -136,10 +149,10 @@
 <div class="toast" id="toast" hidden role="status"></div>
 <div class="modal" id="modal" hidden role="dialog" aria-modal="true"><div class="modalbox" id="modalBox"></div></div>
 
-<script src="config.js?v=4"></script>
+<script src="config.js?v=5"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="leitor.js?v=4"></script>
-<script src="app.js?v=4"></script>
+<script src="leitor.js?v=5"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

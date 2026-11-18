@@ -699,6 +699,112 @@ document.getElementById("arqFolder").onclick=()=>document.getElementById("arqDir
 document.getElementById("arqFiles").onchange=e=>{importarArquivos([...e.target.files]);e.target.value="";};
 document.getElementById("arqDir").onchange=e=>{importarArquivos([...e.target.files]);e.target.value="";};
 
+
+/* ---------- importar NOVOS contratos em lote ---------- */
+async function textoDoPdf(file,{ocr=true,maxOcr=4,worker=null,status=()=>{}}={}){
+  await loadPdfJs();
+  const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+  let text="";
+  for(let i=1;i<=pdf.numPages;i++){ const pg=await pdf.getPage(i); const tc=await pg.getTextContent(); text+="\n"+tc.items.map(t=>t.str+(t.hasEOL?"\n":" ")).join(""); }
+  const letras=text.replace(/[^A-Za-zÀ-ú0-9]/g,"").length;
+  if(letras>=150*Math.min(pdf.numPages,3)||!ocr||!worker) return {text,ocr:false};
+  text="";
+  const n=Math.min(pdf.numPages,maxOcr);
+  for(let i=1;i<=n;i++){
+    status(`reconhecendo texto da imagem, página ${i} de ${n}`);
+    const pg=await pdf.getPage(i); const v0=pg.getViewport({scale:1}); const vp=pg.getViewport({scale:Math.min(2.2,1600/v0.width)});
+    const c=document.createElement("canvas"); c.width=vp.width; c.height=vp.height;
+    await pg.render({canvasContext:c.getContext("2d"),viewport:vp}).promise;
+    const {data}=await worker.recognize(c); text+="\n"+data.text;
+  }
+  return {text,ocr:true};
+}
+function prepImport(){
+  const opt=(v,l)=>`<option value="${esc(v)}"${v==="Comercial"?" selected":""}>${esc(l)}</option>`;
+  document.getElementById("impSetor").innerHTML=SETORES.map(s=>opt(s,s)).join("");
+  document.getElementById("impUnid").innerHTML=UNITS.map((u,i)=>`<label><input type="checkbox" value="${esc(u)}">${esc(u)}</label>`).join("");
+}
+let impRodando=false, impParar=false;
+async function importarNovos(lista){
+  if(impRodando) return;
+  const files=lista.filter(f=>/\.pdf$/i.test(f.name)||/pdf$/i.test(f.type));
+  const log=document.getElementById("impLog");
+  if(!files.length){ log.innerHTML='<div class="aistat bad">Nenhum PDF encontrado na seleção.</div>'; return; }
+  const setor=document.getElementById("impSetor").value;
+  const tipo=document.getElementById("impTipo").value;
+  const unid=[...document.querySelectorAll("#impUnid input:checked")].map(i=>i.value);
+  const usarOcr=document.getElementById("impOcr").checked;
+  const chaveNome=n=>norm(String(n||"").normalize("NFC")).replace(/[^a-z0-9]+/g,"");
+  const jaTem=new Set(); ALL.forEach(d=>(d.anexos||[]).forEach(a=>jaTem.add(chaveNome(a.nome))));
+  const novos=files.filter(f=>!jaTem.has(chaveNome(f.name))).sort((a,b)=>a.name.localeCompare(b.name,"pt-BR",{numeric:true}));
+  const ignorados=files.length-novos.length;
+  if(!novos.length){ log.innerHTML=`<div class="aistat ok">Todos os ${files.length} arquivos já estão no site. Nada a importar.</div>`; return; }
+  if(!window.confirm(`Importar ${novos.length} contrato(s) novo(s) no setor ${setor}?${ignorados?`\n(${ignorados} arquivo(s) já existem no site e serão ignorados.)`:""}\n\nNão feche esta página até terminar.`)) return;
+  impRodando=true; impParar=false; const stopBtn=document.getElementById("impStop"); stopBtn.hidden=false;
+  ["impFolder","impPick"].forEach(id=>document.getElementById(id).disabled=true);
+  let worker=null, ok=0, falhas=[], semDados=0;
+  let num=Math.max(0,...ALL.map(d=>parseInt(d.num,10)||0));
+  const hoje=iso(TODAY), t0=Date.now();
+  const st=(i,f,msg)=>{ const el=(Date.now()-t0)/1000; const rest=i>0?Math.round(el/i*(novos.length-i)/60):null;
+    log.innerHTML=`<div class="aistat work"><span class="spin"></span><b>${i+1} de ${novos.length}</b> · ${esc(f.name)} — ${esc(msg)}${rest!=null?` · cerca de ${rest} min restantes`:""}</div><div class="edited">Criados: ${ok}${falhas.length?` · Falhas: ${falhas.length}`:""}</div>`; };
+  try{
+    if(usarOcr){ try{ await loadOcr(); worker=await Tesseract.createWorker("por"); }catch(e){ console.warn(e); worker=null; } }
+    for(let i=0;i<novos.length;i++){
+      if(impParar) break;
+      const f=novos[i];
+      try{
+        st(i,f,"lendo o PDF");
+        let r={}, lido=null;
+        try{ lido=await textoDoPdf(f,{ocr:usarOcr,worker,status:m=>st(i,f,m)}); r=LeitorContrato.extrair(lido.text,f.name)||{}; }catch(e){ console.warn("leitura",f.name,e); }
+        const base=f.name.replace(/\.pdf$/i,"").trim();
+        if(!r.empresa) semDados++;
+        const dados={};
+        ["empresa","objeto","tipo","inicio","termino","avisoDias","renovAuto","rescDias","valor","reaj","multa","valorMulta","obs"].forEach(k=>{ if(r[k]!=null&&r[k]!=="") dados[k]=r[k]; });
+        if(!dados.empresa) dados.empresa=base;
+        if(tipo) dados.tipo=tipo;
+        const un=unid.length?unid:(Array.isArray(r.unidades)?r.unidades:[]);
+        dados.unidades=un.length?un.join(" / "):null;
+        dados.arquivo=f.name;
+        const s0=pd(dados.inicio), t1=pd(dados.termino);
+        dados.vig=s0&&t1?days(s0,t1):null;
+        if(t1&&dados.avisoDias!=null){const a=new Date(t1);a.setDate(a.getDate()-dados.avisoDias);dados.dataAviso=iso(a);} else dados.dataAviso=null;
+        dados.valorReaj=dados.valor!=null?Math.round(dados.valor*(1+(dados.reaj||0))*100)/100:null;
+        if(dados.obs) dados.obs="[Lido do PDF] "+dados.obs;
+        dados.conf={status:"verificar",data:hoje,nota:`Cadastrado pela importação em lote a partir do arquivo “${f.name}”${lido&&lido.ocr?" (PDF digitalizado, texto reconhecido da imagem)":""}. Os dados foram lidos automaticamente: confira fornecedor, prazos, valores e unidade.`};
+        dados.hist=[{at:new Date().toISOString(),by:MEU_EMAIL,action:"create",fields:["importação em lote"]}];
+        num++; let numero=String(num).padStart(3,"0");
+        while(ALL.some(d=>d.num===numero)){ num++; numero=String(num).padStart(3,"0"); }
+        const id=crypto.randomUUID?crypto.randomUUID():([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16));
+        st(i,f,"criando o contrato");
+        let res=await sb.from("contratos").insert({id,num:numero,setores:[setor],dados,anexos:[]}).select("id");
+        if(res.error&&res.error.code==="23505"){ num++; numero=String(num).padStart(3,"0"); res=await sb.from("contratos").insert({id,num:numero,setores:[setor],dados,anexos:[]}).select("id"); }
+        if(res.error) throw res.error;
+        st(i,f,"enviando o arquivo");
+        const path=await uploadTo(id,f);
+        const u=await sb.from("contratos").update({anexos:[{nome:f.name,path}]}).eq("id",id); if(u.error) throw u.error;
+        ALL.push(derive({...dados,num:numero,setores:[setor],anexos:[{nome:f.name,path}]},id));
+        ok++;
+      }catch(e){ console.warn("importação",f.name,e); falhas.push(`${f.name} (${(e&&(e.message||e.code))||"erro"})`); }
+    }
+  } finally {
+    if(worker) try{ await worker.terminate(); }catch(e){}
+    impRodando=false; stopBtn.hidden=true; stopBtn.textContent="Parar importação"; ["impFolder","impPick"].forEach(id=>document.getElementById(id).disabled=false);
+  }
+  const min=Math.round((Date.now()-t0)/60000);
+  log.innerHTML=`<div class="aistat ${falhas.length?"bad":"ok"}"><b>${ok} contrato(s) criado(s)</b> no setor ${esc(setor)}${impParar?" (importação interrompida)":""}${ignorados?` · ${ignorados} ignorado(s) por já existirem`:""}${min?` · ${min} min`:""}.</div>
+    ${semDados?`<div class="edited">${semDados} arquivo(s) sem dados reconhecidos: o fornecedor ficou com o nome do arquivo.</div>`:""}
+    ${falhas.length?`<div class="edited" style="color:var(--bad)">Falharam (tente de novo só com estes): ${esc(falhas.join(" · "))}</div>`:""}
+    <div class="edited">Para revisar: aba Contratos → filtro <b>“Precisa de verificação”</b>.</div>`;
+  await loadContratos();
+}
+document.getElementById("impFolder").onclick=()=>document.getElementById("impDir").click();
+document.getElementById("impPick").onclick=()=>document.getElementById("impFiles").click();
+document.getElementById("impDir").onchange=e=>{const l=[...e.target.files]; e.target.value=""; importarNovos(l);};
+document.getElementById("impFiles").onchange=e=>{const l=[...e.target.files]; e.target.value=""; importarNovos(l);};
+document.getElementById("impStop").onclick=()=>{ impParar=true; document.getElementById("impStop").textContent="Parando após o arquivo atual…"; };
+window.addEventListener("beforeunload",e=>{ if(impRodando){ e.preventDefault(); e.returnValue=""; } });
+prepImport();
+
 /* ---------- janela (modal) ---------- */
 function openModal(html){const m=document.getElementById("modal");document.getElementById("modalBox").innerHTML=html+(html.includes("spCancel")?"":`<div style="display:flex;justify-content:flex-end"><button class="btn primary" type="button" id="mOk">Entendi</button></div>`);m.hidden=false;const ok=document.getElementById("mOk");if(ok)ok.onclick=closeModal;}
 function closeModal(){document.getElementById("modal").hidden=true;}
