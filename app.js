@@ -4,7 +4,7 @@ const STATUSES = ["Vigente","Renovar","Indeterminado","Encerrado","Distratado"];
 const ST_LABEL = {Vigente:"Vigente",Renovar:"Renovar",Indeterminado:"Prazo indeterminado",Encerrado:"Encerrado",Distratado:"Distratado"};
 const ST_VAR = {Vigente:"--ok",Renovar:"--warn",Indeterminado:"--ind",Encerrado:"--bad",Distratado:"--dis"};
 const UNITS = ["Ritápolis","Perdões","CD","Matriz","Sede BH"];
-const SETORES = ["Manutenção","Captação","G&A","Comercial","Logística","Produção"];
+const SETORES = ["Manutenção","Captação","G&A","Comercial","Logística","Produção","Contabilidade","Financeiro","Diretoria","T.I.","Controladoria","GG"];
 const TODOS = "Todos os setores";
 const FIELDS = [
   {sec:"Identificação"},
