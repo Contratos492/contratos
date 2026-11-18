@@ -600,7 +600,7 @@ async function renderGestores(){
     return `<tr><td><b>${esc(p.nome)}</b>${p.admin?' <span class="chip">administrador</span>':""}</td><td class="num" style="font-size:12.5px">${esc(p.email)}</td>
       <td>${(p.setores||[]).map(s=>`<span class="chip">${esc(s)}</span>`).join(" ")||'<span class="muted">—</span>'}</td><td>${st}</td>
       <td style="white-space:nowrap;text-align:right"><button class="btn" type="button" data-g="edit" data-e="${esc(p.email)}">Editar</button>
-      ${lg?`<button class="btn" type="button" data-g="senha" data-e="${esc(p.email)}">Senha provisória</button>`:""}</td></tr>`;
+      ${lg?`<button class="btn" type="button" data-g="senha" data-e="${esc(p.email)}">Senha provisória</button>`:(p.ativo?`<button class="btn primary" type="button" data-g="login" data-e="${esc(p.email)}">Criar login</button>`:"")}</td></tr>`;
   });
   if(gEditing==="__novo") rows.push(gRowEdit({email:"",nome:"",setores:[],admin:false,ativo:true},true));
   document.getElementById("gbody").innerHTML=rows.join("")||'<tr><td colspan="5" class="empty">Nenhum gestor cadastrado.</td></tr>';
@@ -619,6 +619,7 @@ async function gAction(act,email,btn){
   if(act==="edit"){gEditing=email;renderGestores();return;}
   if(act==="cancel"){gEditing=null;renderGestores();return;}
   if(act==="senha"){ openSenhaProvisoria(email); return; }
+  if(act==="login"){ const p=PERFIL_POR_EMAIL[email]; openCriarLogin(email,p&&p.nome); return; }
   if(act==="del"){
     if(email===MEU_EMAIL){toast("Você não pode remover o seu próprio cadastro.",true);return;}
     if(!window.confirm(`Remover ${email} da lista de gestores? Ele deixa de ver os contratos. (O login no Supabase continua existindo; exclua lá se quiser.)`)) return;
@@ -639,17 +640,42 @@ async function gAction(act,email,btn){
     btn.disabled=false;
     if(error){toast("Não foi possível salvar o gestor.",true);console.warn(error);return;}
     const novo=gEditing==="__novo"; gEditing=null; await loadPerfis(); renderGestores();
-    if(novo&&!LOGINS[em]) openModal(`<h3 style="margin:0">Falta criar o login de ${esc(nome)}</h3>
-      <p>O cadastro foi salvo. Agora crie o login no Supabase:</p>
-      <ol style="padding-left:20px;line-height:1.7"><li>Abra o painel do Supabase → <b>Authentication</b> → <b>Users</b>.</li>
-      <li>Clique em <b>Add user</b> → <b>Create new user</b>.</li>
-      <li>E-mail: <b>${esc(em)}</b> · Senha: invente uma senha provisória · deixe marcado <b>Auto Confirm User</b>.</li>
-      <li>Envie ao gestor o endereço do site, o e-mail e a senha provisória. No primeiro acesso o site pede para ele criar a senha dele.</li></ol>`);
+    if(novo&&!LOGINS[em]) openCriarLogin(em,nome);
     else toast("Gestor salvo");
   }
 }
 document.getElementById("gAdd").onclick=()=>{gEditing="__novo";renderGestores();};
 
+
+function msgAcesso(email,senha){ return `Acesso ao site de contratos SVSA\nEndereço: ${location.origin+location.pathname}\nE-mail: ${email}\nSenha provisória: ${senha}\nNo primeiro acesso o site pede para você criar a sua senha.`; }
+function openCriarLogin(email,nome){
+  openModal(`<h3 style="margin:0">Criar login${nome?` de ${esc(nome)}`:""}</h3>
+    <p>O site cria o acesso de <b>${esc(email)}</b> com a senha provisória abaixo. No primeiro acesso, o gestor cria a senha dele.</p>
+    <div class="field"><label for="clSenha">Senha provisória (mínimo 8 caracteres)</label><input id="clSenha" type="text" autocomplete="off" value="${esc(senhaAleatoria())}"></div>
+    <div class="aistat" id="clMsg"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" type="button" id="spCancel">Agora não</button><button class="btn primary" type="button" id="clOk">Criar login</button></div>`);
+  document.getElementById("spCancel").onclick=closeModal;
+  document.getElementById("clOk").onclick=async e=>{
+    const b=e.currentTarget, s=document.getElementById("clSenha").value.trim(), m=document.getElementById("clMsg");
+    if(s.length<8){ m.className="aistat bad"; m.textContent="A senha precisa ter pelo menos 8 caracteres."; return; }
+    b.disabled=true; m.className="aistat work"; m.innerHTML='<span class="spin"></span>Criando o login…';
+    let erro=null;
+    try{
+      const {data,error}=await sb.functions.invoke("criar-login",{body:{email,senha:s}});
+      if(error){ erro=error.message; try{ const j=await error.context.json(); if(j&&j.error) erro=j.error; }catch(_){ } }
+      else if(data&&data.error) erro=data.error;
+    }catch(x){ erro=String(x&&x.message||x); }
+    if(erro){
+      b.disabled=false; m.className="aistat bad";
+      m.innerHTML=/Failed to send|fetch|404|not found|FunctionsFetchError|FunctionsRelayError/i.test(erro)
+        ?`A criação automática de login ainda não está ativada no Supabase (falta publicar a função <b>criar-login</b>). Enquanto isso, crie em Supabase → Authentication → Users → Add user, com o e-mail <b>${esc(email)}</b> e esta senha.`
+        :esc(erro);
+      return;
+    }
+    closeModal(); copiar(msgAcesso(email,s)); await loadLogins(); if(view==="gestores") renderGestores();
+    toast("Login criado! A mensagem com o endereço, o e-mail e a senha provisória foi copiada — cole no e-mail ou Teams do gestor.");
+  };
+}
 function openSenhaProvisoria(email){
   openModal(`<h3 style="margin:0">Senha provisória</h3>
     <p>Defina uma senha provisória para <b>${esc(email)}</b>. No próximo acesso o site pede para ele criar uma senha nova.</p>
@@ -660,7 +686,7 @@ function openSenhaProvisoria(email){
     const s=document.getElementById("spSenha").value.trim(); e.currentTarget.disabled=true;
     const {error}=await sb.rpc("admin_redefinir_senha",{p_email:email,p_senha:s});
     if(error){e.currentTarget.disabled=false;toast(error.message||"Não foi possível definir a senha.",true);return;}
-    closeModal(); copiar(`Acesso ao site de contratos SVSA\nEndereço: ${location.origin+location.pathname}\nE-mail: ${email}\nSenha provisória: ${s}\nNo primeiro acesso o site pede para você criar a sua senha.`);
+    closeModal(); copiar(msgAcesso(email,s));
     toast("Senha definida. A mensagem com os dados de acesso foi copiada — cole no e-mail ou Teams do gestor.");
   };
 }
