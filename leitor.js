@@ -203,14 +203,20 @@
     /* ---------- setor ---------- */
     const base = low((r.objeto || "") + " " + (r.objeto || "") + " " + flat.slice(0, 6000));
     const S = {
-      "Captação": /produtor(?:es)? (?:rura|de leite)|coleta de leite|captacao de leite|transporte de leite|captacao|pecuari|tanque de expansao|rota do leite|agropecuari|fazenda/g,
+      "Captação": /produtor(?:es)? (?:rura|de leite)|coleta de leite|captacao de leite|transporte de leite|pecuari|tanque de expansao|rota do leite|agropecuari|fazenda|milk/g,
       "Comercial": /merchandising|promotor|promocao de vendas|reposicao de produtos|ponto(?:s)? de venda|\bpdv\b|supermercad|marketing|publicidade|representacao comercial|cadastro de produtos|codigo de barras/g,
       "Logística": /transporte de cargas?|frete|combustive|posto de|abastecimento de veicul|armazenag|empilhadeir|frota|transportadora|logistic|postais|correios|encomendas/g,
       "Manutenção": /manutenc(?:ao|oes) (?:predi|eletr|mecan|corretiva|preventiva)|\bobras?\b|construcao civil|reforma|empreitada|instalac(?:ao|oes) eletric|motores? eletric|rebobina|refrigeracao|caldeiraria|solda|montagens industriais|compressor|cabeamento|hidraulic|munck|icamento/g,
       "Produção": /produtos? quimic|embalage|energia eletrica|insumo|caldeira|tratamento de agua|controle de pragas|desratiz|desinset|laboratori|qualidade|appcc|\bbpf\b|maquin|equipamento industrial|ingredient|fermento|coalho/g,
-      "G&A": /advocat|juridic|contab|software|sistema|licenca de uso|tecnologia da informacao|\bti\b|consultoria|seguro|apolice|plano odontolog|plano de saude|assistencia (?:a )?saude|locacao de imovel|imovel residencial|aluguel|viagens|cartao|associac|filiacao|compliance|recursos humanos|auditoria|internet|telefon|fretamento|transporte de (?:passageiros|funcionarios|empregados)|avaliacao patrimonial|laudo/g
+      "G&A": /assessoria juridica|juridica permanente|contencios|direito (?:tributario|civil|do trabalho|administrativo|penal|contratual)|acoes judiciais|consultoria juridica|servicos juridicos|advocat|honorarios advocat|locacao de imovel|imovel (?:residencial|comercial)|aluguel do imovel|seguro|apolice|associac|filiacao|sindicato|auditoria externa|telefon|cartorio|despachante/g,
+      "T.I.": /software|sistema|licenca de uso|tecnologia da informacao|\bti\b|informatica|internet|link de dados|hospedagem|nuvem|\bsaas\b|plataforma digital|suporte tecnico|multifuncional|impressora|computador|servidor|firewall|backup|rede de dados|comunicacao multimidia|copias|franquia de impress/g,
+      "Contabilidade": /contab|escrituracao|obrigacoes acessorias|\bsped\b|imposto de renda|solucoes fiscais|software fiscal|apuracao de impostos/g,
+      "Financeiro": /instituicao (?:financeira|de pagamento)|servicos financeiros|gestao financeira|cartao(?:es)? (?:de credito )?corporativ|emprestimo|financiamento|antecipacao de recebiveis|cambio|garantia|laudo de avaliacao|tesouraria/g,
+      "Diretoria": /governanca|societari|conselho de administracao|reestruturacao|recuperacao judicial|planejamento estrategico|diretoria|acionista|assessoria empresarial/g,
+      "Controladoria": /controladoria|compliance|lgpd|protecao de dados|auditoria interna|controles internos|orcament|custos|anticorrupcao/g,
+      "GG": /recursos humanos|departamento pessoal|gestao de pessoas|folha de pagamento|beneficio|plano odontolog|plano de saude|assistencia (?:a )?saude|vale[- ](?:alimentacao|refeicao|transporte)|treinamento|recrutamento|seguranca e saude no trabalho|medicina do trabalho|fretamento|transporte de (?:passageiros|funcionarios|empregados)|refeicoes|restaurante/g
     };
-    const PESO = { "Captação": 3, "Comercial": 2, "Logística": 1.5, "Manutenção": 1.2, "Produção": 1.2, "G&A": 1 };
+    const PESO = { "Captação": 6, "Comercial": 2, "Logística": 1.5, "Manutenção": 1.2, "Produção": 1.2, "T.I.": 1.3, "Contabilidade": 1.4, "Financeiro": 1.1, "Diretoria": 1.2, "Controladoria": 1.3, "GG": 1.3, "G&A": 1 };
     let best = null, bestN = 0;
     for (const [k, re] of Object.entries(S)) { const objN = (low(r.objeto || "").match(re) || []).length; const n = ((base.match(re) || []).length + objN * 4) * PESO[k]; if (n > bestN) { best = k; bestN = n; } }
     if (best) r.setores = [best];
